@@ -69,7 +69,7 @@ final class EventTap {
     }
 
     /// Shared logger for event taps.
-    private static let logger = Logger(subsystem: "com.jordanbaird.Ice", category: "EventTap")
+    private static let logger = Logger(subsystem: "com.stonerl.Thaw", category: "EventTap")
 
     /// Shared callback for all event taps.
     private static let sharedCallback: CGEventTapCallBack = { _, type, event, refcon in
