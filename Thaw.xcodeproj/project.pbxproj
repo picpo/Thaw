@@ -3,7 +3,7 @@
 	archiveVersion = 1;
 	classes = {
 	};
-	objectVersion = 70;
+	objectVersion = 77;
 	objects = {
 
 /* Begin PBXBuildFile section */
@@ -47,14 +47,14 @@
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
-		7188A6912E27F9ED008F131D /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		7188A6912E27F9ED008F131D /* Exceptions for "MenuBarItemService" folder in "MenuBarItemService" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
 			);
 			target = 7188A6822E27F9ED008F131D /* MenuBarItemService */;
 		};
-		E2B782F92F2BF98100CF0BBD /* PBXFileSystemSynchronizedBuildFileExceptionSet */ = {
+		E2B782F92F2BF98100CF0BBD /* Exceptions for "Thaw" folder in "Thaw" target */ = {
 			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
 			membershipExceptions = (
 				Resources/Info.plist,
@@ -64,9 +64,27 @@
 /* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
-		7188A6842E27F9ED008F131D /* MenuBarItemService */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (7188A6912E27F9ED008F131D /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = MenuBarItemService; sourceTree = "<group>"; };
-		7188A69E2E280BB4008F131D /* Shared */ = {isa = PBXFileSystemSynchronizedRootGroup; explicitFileTypes = {}; explicitFolders = (); path = Shared; sourceTree = "<group>"; };
-		71BDFBE12C978E2A00EF145F /* Thaw */ = {isa = PBXFileSystemSynchronizedRootGroup; exceptions = (E2B782F92F2BF98100CF0BBD /* PBXFileSystemSynchronizedBuildFileExceptionSet */, ); explicitFileTypes = {}; explicitFolders = (); path = Thaw; sourceTree = "<group>"; };
+		7188A6842E27F9ED008F131D /* MenuBarItemService */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				7188A6912E27F9ED008F131D /* Exceptions for "MenuBarItemService" folder in "MenuBarItemService" target */,
+			);
+			path = MenuBarItemService;
+			sourceTree = "<group>";
+		};
+		7188A69E2E280BB4008F131D /* Shared */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			path = Shared;
+			sourceTree = "<group>";
+		};
+		71BDFBE12C978E2A00EF145F /* Thaw */ = {
+			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				E2B782F92F2BF98100CF0BBD /* Exceptions for "Thaw" folder in "Thaw" target */,
+			);
+			path = Thaw;
+			sourceTree = "<group>";
+		};
 /* End PBXFileSystemSynchronizedRootGroup section */
 
 /* Begin PBXFrameworksBuildPhase section */
@@ -191,7 +209,6 @@
 				};
 			};
 			buildConfigurationList = 716683252A767E6A006ABF84 /* Build configuration list for PBXProject "Thaw" */;
-			compatibilityVersion = "Xcode 14.0";
 			developmentRegion = en;
 			hasScannedForEncodings = 0;
 			knownRegions = (
@@ -207,6 +224,7 @@
 				7127A9FB2C4881BC00D99DEF /* XCRemoteSwiftPackageReference "Ifrit" */,
 				71A065072E680C620087DB38 /* XCRemoteSwiftPackageReference "Semaphore" */,
 			);
+			preferredProjectObjectVersion = 77;
 			productRefGroup = 7166832B2A767E6A006ABF84 /* Products */;
 			projectDirPath = "";
 			projectRoot = "";
