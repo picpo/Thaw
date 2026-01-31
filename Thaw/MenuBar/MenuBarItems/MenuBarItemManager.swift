@@ -226,7 +226,7 @@ extension MenuBarItemManager {
             }
 
             if case .rightOfItem = destination {
-                let range = self[section].startIndex...self[section].endIndex
+                let range = self[section].startIndex ... self[section].endIndex
                 index = (index + 1).clamped(to: range)
             }
 
@@ -251,7 +251,7 @@ extension MenuBarItemManager {
                 return nil
             }
             self.hidden = hidden
-            self.alwaysHidden = items.removeFirst(matching: .alwaysHiddenControlItem)
+            alwaysHidden = items.removeFirst(matching: .alwaysHiddenControlItem)
         }
     }
 
@@ -268,7 +268,7 @@ extension MenuBarItemManager {
 
         init(controlItems: ControlItemPair, displayID: CGDirectDisplayID?) {
             self.controlItems = controlItems
-            self.cache = ItemCache(displayID: displayID)
+            cache = ItemCache(displayID: displayID)
         }
 
         func bestBounds(for item: MenuBarItem) -> CGRect {
@@ -445,15 +445,15 @@ extension MenuBarItemManager {
                 "\(Self.self).invalidEventSource"
             case .missingMouseLocation:
                 "\(Self.self).missingMouseLocation"
-            case .eventCreationFailure(let item):
+            case let .eventCreationFailure(item):
                 "\(Self.self).eventCreationFailure(item: \(item.tag))"
-            case .eventOperationTimeout(let item):
+            case let .eventOperationTimeout(item):
                 "\(Self.self).eventOperationTimeout(item: \(item.tag))"
-            case .itemNotMovable(let item):
+            case let .itemNotMovable(item):
                 "\(Self.self).itemNotMovable(item: \(item.tag))"
-            case .itemResponseTimeout(let item):
+            case let .itemResponseTimeout(item):
                 "\(Self.self).itemResponseTimeout(item: \(item.tag))"
-            case .missingItemBounds(let item):
+            case let .missingItemBounds(item):
                 "\(Self.self).missingItemBounds(item: \(item.tag))"
             }
         }
@@ -466,15 +466,15 @@ extension MenuBarItemManager {
                 "Invalid event source"
             case .missingMouseLocation:
                 "Missing mouse location"
-            case .eventCreationFailure(let item):
+            case let .eventCreationFailure(item):
                 "Could not create event for \"\(item.displayName)\""
-            case .eventOperationTimeout(let item):
+            case let .eventOperationTimeout(item):
                 "Event operation timed out for \"\(item.displayName)\""
-            case .itemNotMovable(let item):
+            case let .itemNotMovable(item):
                 "\"\(item.displayName)\" is not movable"
-            case .itemResponseTimeout(let item):
+            case let .itemResponseTimeout(item):
                 "\"\(item.displayName)\" took too long to respond"
-            case .missingItemBounds(let item):
+            case let .missingItemBounds(item):
                 "Missing bounds rectangle for \"\(item.displayName)\""
             }
         }
@@ -883,15 +883,15 @@ extension MenuBarItemManager {
         /// The destination's target item.
         var targetItem: MenuBarItem {
             switch self {
-            case .leftOfItem(let item), .rightOfItem(let item): item
+            case let .leftOfItem(item), let .rightOfItem(item): item
             }
         }
 
         /// A string to use for logging purposes.
         var logString: String {
             switch self {
-            case .leftOfItem(let item): "left of \(item.logString)"
-            case .rightOfItem(let item): "right of \(item.logString)"
+            case let .leftOfItem(item): "left of \(item.logString)"
+            case let .rightOfItem(item): "right of \(item.logString)"
             }
         }
     }
@@ -1161,7 +1161,7 @@ extension MenuBarItemManager {
         }
 
         let maxAttempts = 8
-        for n in 1...maxAttempts {
+        for n in 1 ... maxAttempts {
             guard !Task.isCancelled else {
                 throw EventError.cannotComplete
             }
@@ -1303,7 +1303,7 @@ extension MenuBarItemManager {
         }
 
         let maxAttempts = 4
-        for n in 1...maxAttempts {
+        for n in 1 ... maxAttempts {
             guard !Task.isCancelled else {
                 throw EventError.cannotComplete
             }
@@ -1638,10 +1638,25 @@ extension MenuBarItemManager {
         // Get all on-screen windows.
         let windows = WindowInfo.createWindows(option: .onScreen)
 
+        logger.debug("Checking for open menus - Found \(items.count) menu bar items with PIDs: \(sourcePIDs)")
+
         // Check if any of the items' owning applications have a menu-related window.
-        return windows.contains { window in
-            sourcePIDs.contains(window.ownerPID) && window.isMenuRelated && (window.title?.isEmpty ?? true)
+        let result = windows.contains { window in
+            // Skip Control Center windows as they can be falsely detected when hovering
+            guard window.owningApplication?.bundleIdentifier != MenuBarItemTag.Namespace.controlCenter.description else {
+                logger.debug("Skipping Control Center window: PID \(window.ownerPID), title: \(window.title ?? "nil")")
+                return false
+            }
+
+            let isMenuOpen = sourcePIDs.contains(window.ownerPID) && window.isMenuRelated && (window.title?.isEmpty ?? true)
+            if isMenuOpen {
+                logger.debug("Found open menu window: PID \(window.ownerPID), owner: \(window.ownerName as NSObject?), title: \(window.title ?? "nil"), isMenuRelated: \(window.isMenuRelated)")
+            }
+            return isMenuOpen
         }
+
+        logger.debug("Menu open check result: \(result)")
+        return result
     }
 }
 
@@ -1656,8 +1671,8 @@ private enum MenuBarItemEventType {
 
     var cgEventType: CGEventType {
         switch self {
-        case .move(let subtype): subtype.cgEventType
-        case .click(let subtype): subtype.cgEventType
+        case let .move(subtype): subtype.cgEventType
+        case let .click(subtype): subtype.cgEventType
         }
     }
 
@@ -1671,7 +1686,7 @@ private enum MenuBarItemEventType {
     var cgMouseButton: CGMouseButton {
         switch self {
         case .move: .left
-        case .click(let subtype): subtype.cgMouseButton
+        case let .click(subtype): subtype.cgMouseButton
         }
     }
 
@@ -1853,7 +1868,7 @@ private extension CGEvent {
         case .hidEventTap: post(tap: .cghidEventTap)
         case .sessionEventTap: post(tap: .cgSessionEventTap)
         case .annotatedSessionEventTap: post(tap: .cgAnnotatedSessionEventTap)
-        case .pid(let pid): postToPid(pid)
+        case let .pid(pid): postToPid(pid)
         }
     }
 
@@ -1896,7 +1911,7 @@ private extension CGEvent {
     }
 
     private func setClickState(for type: MenuBarItemEventType) {
-        if case .click(let subtype) = type {
+        if case let .click(subtype) = type {
             setIntegerValueField(.mouseEventClickState, value: subtype.clickState)
         }
     }
