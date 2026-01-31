@@ -1,4 +1,6 @@
 included:
+  - MenuBarItemService
+  - Shared
   - Thaw
 
 disabled_rules:
