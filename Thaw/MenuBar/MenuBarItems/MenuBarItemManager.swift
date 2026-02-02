@@ -70,14 +70,61 @@ final class MenuBarItemManager: ObservableObject {
     /// Storage for internal observers.
     private var cancellables = Set<AnyCancellable>()
 
+    /// Timer for lightweight periodic cache checks.
+    private var cacheTickCancellable: AnyCancellable?
+
+    /// Persisted identifiers of menu bar items we've already seen.
+    private var knownItemIdentifiers = Set<String>()
+    /// Persisted bundle identifiers explicitly placed in hidden section.
+    private var pinnedHiddenBundleIDs = Set<String>()
+    /// Persisted bundle identifiers explicitly placed in always-hidden section.
+    private var pinnedAlwaysHiddenBundleIDs = Set<String>()
+
+    /// Loads persisted known item identifiers.
+    private func loadKnownItemIdentifiers() {
+        let key = "MenuBarItemManager.knownItemIdentifiers"
+        let defaults = UserDefaults.standard
+        if let stored = defaults.array(forKey: key) as? [String] {
+            knownItemIdentifiers = Set(stored)
+        }
+    }
+
+    /// Persists known item identifiers.
+    private func persistKnownItemIdentifiers() {
+        let key = "MenuBarItemManager.knownItemIdentifiers"
+        let defaults = UserDefaults.standard
+        defaults.set(Array(knownItemIdentifiers), forKey: key)
+    }
+
+    /// Loads persisted pinned bundle identifiers.
+    private func loadPinnedBundleIDs() {
+        let defaults = UserDefaults.standard
+        if let hidden = defaults.array(forKey: "MenuBarItemManager.pinnedHiddenBundleIDs") as? [String] {
+            pinnedHiddenBundleIDs = Set(hidden)
+        }
+        if let alwaysHidden = defaults.array(forKey: "MenuBarItemManager.pinnedAlwaysHiddenBundleIDs") as? [String] {
+            pinnedAlwaysHiddenBundleIDs = Set(alwaysHidden)
+        }
+    }
+
+    /// Persists pinned bundle identifiers.
+    private func persistPinnedBundleIDs() {
+        let defaults = UserDefaults.standard
+        defaults.set(Array(pinnedHiddenBundleIDs), forKey: "MenuBarItemManager.pinnedHiddenBundleIDs")
+        defaults.set(Array(pinnedAlwaysHiddenBundleIDs), forKey: "MenuBarItemManager.pinnedAlwaysHiddenBundleIDs")
+    }
+
     /// The shared app state.
     private(set) weak var appState: AppState?
 
     /// Sets up the manager.
     func performSetup(with appState: AppState) async {
         self.appState = appState
+        loadKnownItemIdentifiers()
+        loadPinnedBundleIDs()
         await cacheItemsRegardless()
         configureCancellables(with: appState)
+        configureCacheTick()
     }
 
     /// Configures the internal observers for the manager.
@@ -110,6 +157,19 @@ final class MenuBarItemManager: ObservableObject {
             .store(in: &c)
 
         cancellables = c
+    }
+
+    /// Sets up a lightweight periodic cache tick to catch new items promptly.
+    private func configureCacheTick() {
+        cacheTickCancellable?.cancel()
+        cacheTickCancellable = Timer.publish(every: 3, on: .main, in: .common)
+            .autoconnect()
+            .sink { [weak self] _ in
+                guard let self else { return }
+                Task {
+                    await self.cacheItemsIfNeeded()
+                }
+            }
     }
 
     /// Returns a Boolean value that indicates whether the most recent
@@ -265,6 +325,7 @@ extension MenuBarItemManager {
         var cache: ItemCache
         var temporarilyShownItems = [(MenuBarItem, MoveDestination)]()
         var shouldClearCachedItemWindowIDs = false
+        var relocatedItems = [MenuBarItem]()
 
         private(set) lazy var hiddenControlItemBounds = bestBounds(for: controlItems.hidden)
         private(set) lazy var alwaysHiddenControlItemBounds = controlItems.alwaysHidden.map(bestBounds)
@@ -370,17 +431,21 @@ extension MenuBarItemManager {
     /// Before caching, this method ensures that the control items for
     /// the hidden and always-hidden sections are correctly ordered,
     /// arranging them into valid positions if needed.
-    func cacheItemsRegardless(_ currentItemWindowIDs: [CGWindowID]? = nil) async {
+    func cacheItemsRegardless(
+        _ currentItemWindowIDs: [CGWindowID]? = nil,
+        skipRecentMoveCheck: Bool = false
+    ) async {
         await cacheActor.runCacheTask { [weak self] in
             guard let self else {
                 return
             }
 
-            guard !lastMoveOperationOccurred(within: .seconds(1)) else {
+            guard skipRecentMoveCheck || !lastMoveOperationOccurred(within: .seconds(1)) else {
                 logger.debug("Skipping menu bar item cache due to recent item movement")
                 return
             }
 
+            let previousWindowIDs = await cacheActor.cachedItemWindowIDs
             let displayID = Bridging.getActiveMenuBarDisplayID()
             var items = await MenuBarItem.getMenuBarItems(option: .activeSpace)
 
@@ -400,6 +465,20 @@ extension MenuBarItemManager {
             }
 
             await enforceControlItemOrder(controlItems: controlItems)
+
+            if await relocateNewLeftmostItems(
+                items,
+                controlItems: controlItems,
+                previousWindowIDs: previousWindowIDs
+            ) {
+                logger.debug("Relocated new leftmost items; scheduling recache")
+                Task { [weak self] in
+                    try? await Task.sleep(for: .milliseconds(300))
+                    await self?.cacheItemsRegardless(skipRecentMoveCheck: true)
+                }
+                return
+            }
+
             await uncheckedCacheItems(items: items, controlItems: controlItems, displayID: displayID)
         }
     }
@@ -1610,6 +1689,92 @@ extension MenuBarItemManager {
 // MARK: - Control Item Order
 
 extension MenuBarItemManager {
+    /// Relocates any newly appearing items that macOS placed to the left
+    /// of our control items back into the visible section.
+    ///
+    /// Returns true if a relocation was performed.
+    private func relocateNewLeftmostItems(
+        _ items: [MenuBarItem],
+        controlItems: ControlItemPair,
+        previousWindowIDs: [CGWindowID]
+    ) async -> Bool {
+        guard appState != nil else { return false }
+
+        guard !previousWindowIDs.isEmpty else {
+            return false
+        }
+
+        // Avoid relocating items already assigned to hidden/always-hidden sections.
+        let hiddenTags = Set(itemCache[.hidden].map(\.tag))
+        let alwaysHiddenTags = Set(itemCache[.alwaysHidden].map(\.tag))
+
+        /// Track bundle IDs for pinned items in hidden/always-hidden.
+        func bundleID(for item: MenuBarItem) -> String? {
+            item.sourceApplication?.bundleIdentifier ?? item.owningApplication?.bundleIdentifier
+        }
+
+        for item in itemCache[.hidden] {
+            if let id = bundleID(for: item) {
+                pinnedHiddenBundleIDs.insert(id)
+            }
+        }
+        for item in itemCache[.alwaysHidden] {
+            if let id = bundleID(for: item) {
+                pinnedAlwaysHiddenBundleIDs.insert(id)
+            }
+        }
+        persistPinnedBundleIDs()
+
+        // Identify items that are to the left of the hidden control item bounds.
+        let hiddenBounds = bestBounds(for: controlItems.hidden)
+        let leftmostItems = items
+            .filter {
+                // Must be left of hidden divider, movable, hideable, non-control, and on-screen.
+                $0.bounds.maxX <= hiddenBounds.minX &&
+                    $0.isMovable &&
+                    $0.canBeHidden &&
+                    !$0.isControlItem
+            }
+            .sorted { $0.bounds.minX < $1.bounds.minX }
+
+        guard !leftmostItems.isEmpty else {
+            return false
+        }
+
+        // Identify a candidate that is new (windowID or tag/namespace) and not already placed/pinned in hidden areas.
+        let previousIDs = Set(previousWindowIDs)
+        let candidate = leftmostItems.first { item in
+            let identifier = "\(item.tag.namespace):\(item.tag.title)"
+            let isNewID = !previousIDs.contains(item.windowID)
+            let isNewIdentity = !knownItemIdentifiers.contains(identifier)
+            let notPlacedHidden = !hiddenTags.contains(item.tag) && !alwaysHiddenTags.contains(item.tag)
+            let bundle = bundleID(for: item)
+            let notPinnedHidden = bundle.map { !pinnedHiddenBundleIDs.contains($0) && !pinnedAlwaysHiddenBundleIDs.contains($0) } ?? true
+            return notPlacedHidden && notPinnedHidden && (isNewID || isNewIdentity)
+        }
+        guard let candidate else { return false }
+
+        // Track this item so we don't move it again unless it truly appears new.
+        let identifier = "\(candidate.tag.namespace):\(candidate.tag.title)"
+        knownItemIdentifiers.insert(identifier)
+        persistKnownItemIdentifiers()
+
+        // Move only the offending item to the right of the hidden control item (i.e., into visible section).
+        do {
+            try await move(item: candidate, to: .rightOfItem(controlItems.hidden))
+        } catch {
+            logger.error("Failed to relocate \(candidate.logString, privacy: .public): \(error, privacy: .public)")
+            return false
+        }
+
+        return true
+    }
+
+    /// Returns the best-known bounds for a menu bar item.
+    private func bestBounds(for item: MenuBarItem) -> CGRect {
+        Bridging.getWindowBounds(for: item.windowID) ?? item.bounds
+    }
+
     /// Enforces the order of the given control items, ensuring that the
     /// control item for the always-hidden section is positioned to the
     /// left of control item for the hidden section.
