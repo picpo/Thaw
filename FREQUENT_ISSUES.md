@@ -15,7 +15,7 @@ these items appearing in the always-hidden section, even if they have been previ
 [#6](https://github.com/jordanbaird/Ice/issues/6) and [#26](https://github.com/jordanbaird/Ice/issues/26) are implemented, Ice will be able to
 monitor the items in the menu bar, and move the ones it recognizes to their previous locations, even if macOS rearranges them.~
 
-This issue should be resolved with commit: 1d77308
+This issue should be resolved with commit: [1d77308](https://github.com/stonerl/Thaw/commit/1d77308e330afc8235884931e86574eccf9d3924)
 
 ## Ice removed an item
 
