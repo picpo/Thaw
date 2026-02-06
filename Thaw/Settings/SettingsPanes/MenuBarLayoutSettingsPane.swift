@@ -6,11 +6,16 @@
 //  Copyright (Thaw) © 2026 Toni Förster
 //  Licensed under the GNU GPLv3
 
+import OSLog
 import SwiftUI
 
 struct MenuBarLayoutSettingsPane: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var itemManager: MenuBarItemManager
+
+    @State private var loadDeadlineReached = false
+
+    private let logger = Logger(category: "MenuBarLayoutPane")
 
     private var hasItems: Bool {
         !itemManager.itemCache.managedItems.isEmpty
@@ -53,7 +58,32 @@ struct MenuBarLayoutSettingsPane: View {
         .allowsHitTesting(hasItems)
         .overlay {
             if !hasItems {
-                loadingMenuBarItems
+                VStack(spacing: 8) {
+                    Text(loadDeadlineReached ? "Unable to load menu bar items" : "Loading menu bar items…")
+                    if loadDeadlineReached {
+                        EmptyView()
+                    } else {
+                        ProgressView()
+                    }
+                }
+            }
+        }
+        .task(id: hasItems) {
+            loadDeadlineReached = false
+
+            guard !hasItems, ScreenCapture.cachedCheckPermissions() else {
+                return
+            }
+
+            logger.debug("Preloading menu bar layout caches")
+            await itemManager.cacheItemsRegardless(skipRecentMoveCheck: true)
+            await appState.imageCache.updateCacheWithoutChecks(sections: MenuBarSection.Name.allCases)
+
+            try? await Task.sleep(for: .seconds(3))
+
+            if !hasItems {
+                loadDeadlineReached = true
+                logger.error("Menu bar layout failed to load items after timeout. cacheItems: \(itemManager.itemCache.managedItems.count), images: \(appState.imageCache.images.count)")
             }
         }
     }
