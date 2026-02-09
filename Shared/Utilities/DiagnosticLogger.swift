@@ -47,6 +47,30 @@ final class DiagnosticLogger: @unchecked Sendable {
             .appendingPathComponent("Thaw", isDirectory: true)
     }
 
+    /// Returns whether any log files exist in the log directory.
+    var hasLogFiles: Bool {
+        latestLogFile != nil
+    }
+
+    /// Returns the most recent log file in the log directory, if any.
+    var latestLogFile: URL? {
+        guard let contents = try? FileManager.default.contentsOfDirectory(
+            at: logDirectory,
+            includingPropertiesForKeys: [.creationDateKey],
+            options: .skipsHiddenFiles
+        ) else {
+            return nil
+        }
+        return contents
+            .filter { $0.pathExtension == "log" }
+            .sorted { a, b in
+                let dateA = (try? a.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+                let dateB = (try? b.resourceValues(forKeys: [.creationDateKey]))?.creationDate ?? .distantPast
+                return dateA > dateB
+            }
+            .first
+    }
+
     /// The current log file URL, if logging is active.
     private let _currentLogFile = OSAllocatedUnfairLock<URL?>(initialState: nil)
 

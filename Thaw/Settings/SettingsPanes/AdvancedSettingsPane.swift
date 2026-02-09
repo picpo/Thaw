@@ -12,6 +12,7 @@ struct AdvancedSettingsPane: View {
     @EnvironmentObject var appState: AppState
     @ObservedObject var settings: AdvancedSettings
     @State private var maxSliderLabelWidth: CGFloat = 0
+    @State private var currentLogFileName: String?
 
     private var menuBarManager: MenuBarManager {
         appState.menuBarManager
@@ -157,19 +158,27 @@ struct AdvancedSettingsPane: View {
                 .padding(.trailing, 75)
             }
 
-            if settings.enableDiagnosticLogging {
-                HStack(spacing: 12) {
+            HStack(spacing: 12) {
+                if settings.enableDiagnosticLogging || DiagnosticLogger.shared.hasLogFiles {
                     Button("Show Log Files in Finder") {
                         let url = DiagnosticLogger.shared.logDirectory
                         NSWorkspace.shared.open(url)
                     }
-
-                    if let logFile = DiagnosticLogger.shared.currentLogFile {
-                        Text(logFile.lastPathComponent)
-                            .font(.caption)
-                            .foregroundStyle(.secondary)
-                    }
                 }
+
+                if let currentLogFileName {
+                    Text(currentLogFileName)
+                        .font(.caption)
+                        .foregroundStyle(.secondary)
+                }
+            }
+            .task(id: settings.enableDiagnosticLogging) {
+                // Small yield to let the Combine sink create/close the log file first.
+                try? await Task.sleep(for: .milliseconds(50))
+                currentLogFileName = (
+                    DiagnosticLogger.shared.currentLogFile
+                        ?? DiagnosticLogger.shared.latestLogFile
+                )?.lastPathComponent
             }
         }
     }
