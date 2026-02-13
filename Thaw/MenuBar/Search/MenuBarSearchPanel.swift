@@ -154,6 +154,7 @@ final class MenuBarSearchPanel: NSPanel {
         appState.navigationState.isSearchPresented = true
 
         Task {
+            await appState.itemManager.cacheItemsIfNeeded()
             await appState.imageCache.updateCache()
             appState.imageCache.logCacheStatus("Search panel opened")
 

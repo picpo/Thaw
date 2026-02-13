@@ -111,33 +111,35 @@ final class MenuBarItemImageCache: ObservableObject {
                 // For now, just let it run as long as the app is alive since it's global
             }
 
-            Publishers.Merge3(
-                // Update every 500ms at minimum.
-                Timer.publish(every: 0.5, on: .main, in: .default).autoconnect()
-                    .replace(with: ()),
-
-                // Update when the active space or screen parameters change.
-                Publishers.Merge(
-                    NSWorkspace.shared.notificationCenter.publisher(
-                        for: NSWorkspace.activeSpaceDidChangeNotification
-                    ),
-                    NotificationCenter.default.publisher(
-                        for: NSApplication.didChangeScreenParametersNotification
-                    )
-                )
-                .replace(with: ()),
-
-                // Update when the average menu bar color or cached items change.
-                Publishers.Merge(
-                    appState.menuBarManager.$averageColorInfo.removeDuplicates()
-                        .replace(with: ()),
-                    appState.itemManager.$itemCache.removeDuplicates().replace(
-                        with: ()
-                    )
-                )
+            let spaceChangePublisher: AnyPublisher<Void, Never> = NSWorkspace.shared.notificationCenter.publisher(
+                for: NSWorkspace.activeSpaceDidChangeNotification
             )
-            .throttle(for: 0.5, scheduler: DispatchQueue.main, latest: false)
-            .sink { [weak self] in
+            .map { _ in () }
+            .eraseToAnyPublisher()
+
+            let screenChangePublisher: AnyPublisher<Void, Never> = NotificationCenter.default.publisher(
+                for: NSApplication.didChangeScreenParametersNotification
+            )
+            .map { _ in () }
+            .eraseToAnyPublisher()
+
+            let colorChangePublisher: AnyPublisher<Void, Never> = appState.menuBarManager.$averageColorInfo
+                .removeDuplicates()
+                .map { _ in () }
+                .eraseToAnyPublisher()
+
+            let itemCacheChangePublisher: AnyPublisher<Void, Never> = appState.itemManager.$itemCache
+                .removeDuplicates()
+                .map { _ in () }
+                .eraseToAnyPublisher()
+
+            Publishers.MergeMany([
+                spaceChangePublisher,
+                screenChangePublisher,
+                colorChangePublisher,
+                itemCacheChangePublisher,
+            ])
+            .sink { [weak self] _ in
                 guard let self else {
                     return
                 }

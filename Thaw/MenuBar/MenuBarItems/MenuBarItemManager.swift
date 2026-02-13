@@ -231,7 +231,6 @@ final class MenuBarItemManager: ObservableObject {
         await cacheItemsRegardless()
         MenuBarItemManager.diagLog.debug("performSetup: initial cache complete, items in cache: visible=\(itemCache[.visible].count), hidden=\(itemCache[.hidden].count), alwaysHidden=\(itemCache[.alwaysHidden].count), managedItems=\(itemCache.managedItems.count)")
         configureCancellables(with: appState)
-        configureCacheTick()
         MenuBarItemManager.diagLog.debug("performSetup: MenuBarItemManager setup complete")
     }
 
@@ -284,19 +283,6 @@ final class MenuBarItemManager: ObservableObject {
             .store(in: &c)
 
         cancellables = c
-    }
-
-    /// Sets up a lightweight periodic cache tick to catch new items promptly.
-    private func configureCacheTick() {
-        cacheTickCancellable?.cancel()
-        cacheTickCancellable = Timer.publish(every: 3, on: .main, in: .common)
-            .autoconnect()
-            .sink { [weak self] _ in
-                guard let self else { return }
-                Task {
-                    await self.cacheItemsIfNeeded()
-                }
-            }
     }
 
     /// Returns a Boolean value that indicates whether the most recent
