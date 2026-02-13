@@ -1290,77 +1290,23 @@ extension MenuBarItemManager {
         let itemBounds = try await getCurrentBounds(for: item)
         let targetBounds = try await getCurrentBounds(for: destination.targetItem)
 
-        var start: CGPoint
-        var end: CGPoint
+        let start: CGPoint
+        let end: CGPoint
 
         switch destination {
         case .leftOfItem:
-            start = CGPoint(x: targetBounds.minX, y: targetBounds.minY)
+            // Target the center of the item to avoid corners.
+            // Using midX naturally keeps us away from the top edge corners.
+            start = CGPoint(x: targetBounds.midX, y: targetBounds.minY)
             end = start
-            if itemBounds.maxX <= targetBounds.minX {
-                // Direction of movement: ->
-                end.x -= itemBounds.width
-            } else {
-                // Direction of movement: <-
-                start.x -= 1
-            }
         case .rightOfItem:
-            start = CGPoint(x: targetBounds.maxX, y: targetBounds.minY)
+            start = CGPoint(x: targetBounds.midX, y: targetBounds.minY)
             end = start
-            if itemBounds.minX <= targetBounds.maxX {
-                // Direction of movement: ->
-                end.x -= itemBounds.width
-            } else {
-                // Direction of movement: <-
-                start.x += 1
-            }
         }
 
-        // Keep the initial press away from the Apple menu hit region.
-        if let screen = NSScreen.screens.first(where: { $0.displayID == displayID }) {
-            let padding: CGFloat = 6
-            let displayBounds = CGDisplayBounds(displayID)
-
-            var clampSource = "none"
-            if #available(macOS 16.0, *) {
-                var safeMaxX: CGFloat?
-                if let menuFrame = screen.getApplicationMenuFrame() {
-                    safeMaxX = menuFrame.maxX
-                    clampSource = "axMenuFrame"
-                }
-                if safeMaxX == nil {
-                    let items = await MenuBarItem.getMenuBarItems(on: displayID, option: .onScreen)
-                    if let minX = items
-                        .filter({ $0.bounds.intersects(displayBounds) })
-                        .map(\.bounds.minX)
-                        .min()
-                    {
-                        safeMaxX = max(displayBounds.minX + 60, minX - padding)
-                        clampSource = "leftmostItem"
-                    }
-                }
-                let fallback = displayBounds.minX + 80
-                start.x = max(start.x, (safeMaxX ?? fallback) + padding)
-            } else {
-                // macOS 14/15: avoid over-estimating the Apple menu region; clamp only within the target display band.
-                let guardMin = displayBounds.minX + 80
-                let guardMax = targetBounds.minX - 2
-                start.x = min(max(start.x, guardMin), guardMax)
-                clampSource = "guardBand"
-            }
-
-            // Keep event coordinates away from screen corners to avoid
-            // triggering macOS hot corners.
-            let cornerSafeX: CGFloat = 15
-
-            // Clamping X is safer than clamping Y as it avoids the "stuck pointer" issue.
-            start.x = min(max(start.x, displayBounds.minX + cornerSafeX), displayBounds.maxX - cornerSafeX)
-            end.x = min(max(end.x, displayBounds.minX + cornerSafeX), displayBounds.maxX - cornerSafeX)
-
-            MenuBarItemManager.diagLog.debug(
-                "Move clamp source=\(clampSource) startX=\(start.x) endX=\(end.x) startY=\(start.y) targetMinX=\(targetBounds.minX) itemMinX=\(itemBounds.minX) targetTag=\(destination.targetItem.tag) itemTag=\(item.tag) display=\(displayID)"
-            )
-        }
+        MenuBarItemManager.diagLog.debug(
+            "Move points: startX=\(start.x) endX=\(end.x) startY=\(start.y) targetMinX=\(targetBounds.minX) itemMinX=\(itemBounds.minX) targetTag=\(destination.targetItem.tag) itemTag=\(item.tag) display=\(displayID)"
+        )
         return (start, end)
     }
 
