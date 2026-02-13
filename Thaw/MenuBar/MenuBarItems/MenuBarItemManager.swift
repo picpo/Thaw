@@ -1497,23 +1497,6 @@ extension MenuBarItemManager {
             resolvedDisplayID = Bridging.getActiveMenuBarDisplayID() ?? CGMainDisplayID()
         }
 
-        // If the target display is not the one with the active menu bar, nudge it.
-        // This is crucial when a fullscreen app is on another monitor.
-        if Bridging.getActiveMenuBarDisplayID() != resolvedDisplayID {
-            let displayBounds = CGDisplayBounds(resolvedDisplayID)
-            // Target a neutral spot in the menu bar background (far left, just past the Apple menu).
-            let nudgePoint = CGPoint(x: displayBounds.minX + 60, y: displayBounds.minY + 10)
-            let source = try? getEventSource()
-            if let down = CGEvent(mouseEventSource: source, mouseType: .leftMouseDown, mouseCursorPosition: nudgePoint, mouseButton: .left),
-               let up = CGEvent(mouseEventSource: source, mouseType: .leftMouseUp, mouseCursorPosition: nudgePoint, mouseButton: .left)
-            {
-                down.post(to: .sessionEventTap)
-                up.post(to: .sessionEventTap)
-                // Give the system a micro-moment to register the focus change.
-                try? await Task.sleep(for: .milliseconds(50))
-            }
-        }
-
         if !skipInputPause {
             try await waitForUserToPauseInput()
         }
