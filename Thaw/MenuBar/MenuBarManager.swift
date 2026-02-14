@@ -235,7 +235,7 @@ final class MenuBarManager: ObservableObject {
                         let alwaysHiddenControlItem = screenItems.first { $0.tag == .alwaysHiddenControlItem }
 
                         // TODO: This section needs to be improved but is okay for now.
-                        
+
                         // Get control item bounds and hidden items width
                         var controlBounds: CGRect = .zero
                         var hiddenItemsWidth: CGFloat = 0
