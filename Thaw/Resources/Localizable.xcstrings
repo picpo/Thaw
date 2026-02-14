@@ -2506,7 +2506,7 @@
         "de" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Einen leeren Bereich der Menüleiste anklicken, um versteckte Einträge anzuzeigen oder doppelklicken um sie immer zu verstecken."
+            "value" : "Leeren Bereich der Menüleiste anklicken, um versteckte – oder doppelklicken, um immer versteckte Einträge anzuzeigen."
           }
         },
         "id" : {
